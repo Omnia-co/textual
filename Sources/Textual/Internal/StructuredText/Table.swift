@@ -11,7 +11,6 @@ extension StructuredText {
   struct Table: View {
     @Environment(\.tableStyle) private var tableStyle
 
-    @State private var spacing = TableCell.Spacing()
 
     private let intent: PresentationIntent.IntentType?
     private let content: AttributedSubstring
@@ -33,9 +32,7 @@ extension StructuredText {
         indentationLevel: indentationLevel
       )
       let resolvedStyle = tableStyle.resolve(configuration: configuration)
-        .onPreferenceChange(TableCell.SpacingKey.self) { @MainActor in
-          spacing = $0
-        }
+
 
       AnyView(resolvedStyle)
     }
@@ -44,19 +41,21 @@ extension StructuredText {
     private var label: some View {
       let rowRuns = content.blockRuns(parent: intent)
 
-      Grid(horizontalSpacing: spacing.horizontal, verticalSpacing: spacing.vertical) {
-        ForEach(rowRuns.indices, id: \.self) { rowIndex in
-          let rowRun = rowRuns[rowIndex]
-          let rowContent = content[rowRun.range]
-          let columnRuns = rowContent.blockRuns(parent: rowRun.intent)
-
-          GridRow {
-            ForEach(columnRuns.indices, id: \.self) { columnIndex in
-              let cellRun = columnRuns[columnIndex]
-              let cellContent = rowContent[cellRun.range]
-
-              TableCell(cellContent, row: rowIndex, column: columnIndex)
-                .gridColumnAlignment(alignment(for: columnIndex))
+      WithTableCellSpacing { spacing in
+        Grid(horizontalSpacing: spacing.horizontal, verticalSpacing: spacing.vertical) {
+          ForEach(rowRuns.indices, id: \.self) { rowIndex in
+            let rowRun = rowRuns[rowIndex]
+            let rowContent = content[rowRun.range]
+            let columnRuns = rowContent.blockRuns(parent: rowRun.intent)
+  
+            GridRow {
+              ForEach(columnRuns.indices, id: \.self) { columnIndex in
+                let cellRun = columnRuns[columnIndex]
+                let cellContent = rowContent[cellRun.range]
+  
+                TableCell(cellContent, row: rowIndex, column: columnIndex)
+                  .gridColumnAlignment(alignment(for: columnIndex))
+              }
             }
           }
         }
@@ -84,4 +83,14 @@ extension StructuredText {
       }
     }
   }
+}
+
+private struct WithTableCellSpacing<Content: View>: View {
+  @Environment(\.textualTableCellSpacing) private var spacing
+  @ViewBuilder var content: (StructuredText.TableCell.Spacing) -> Content
+  var body: some View { content(spacing) }
+}
+
+extension EnvironmentValues {
+  @Entry var textualTableCellSpacing = StructuredText.TableCell.Spacing()
 }
